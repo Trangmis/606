@@ -1,0 +1,577 @@
+---
+title: "DATA 606 Data Project Proposal"
+author: "Trang Do"
+output: pdf_document
+---
+
+### Data Preparation
+
+```{r setup, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+library(tidyverse)
+library(reshape2)
+library(tidyr)
+library(ggplot2)
+library(gridExtra)
+
+# load data
+Math2013_2015 ="https://raw.githubusercontent.com/Trangmis/606/master/2013_2015_NYS_Mathematics_Exam_by%20School.csv"
+Math2006_2011 = "https://raw.githubusercontent.com/Trangmis/606/master/2006_2011_NYS_Math_Test_Results_By_Grade_School_Level_All_Students.csv"
+
+math_test_old = read.csv(file = Math2006_2011)
+math_test_new = read.csv(file = Math2013_2015)
+glimpse(math_test_old)
+glimpse(math_test_new)
+```
+
+
+### Research question 
+
+**You should phrase your research question in a way that matches up with the scope of inference your dataset allows for.**
+Since the NYSED changed the common core standards, there are changes of number of students who opt-out/opt-in ELA & Math exams. What are patterns impacted from the change?
+
+ 
+### Cases 
+
+**What are the cases, and how many are there?**
+There are 28,478 cases for the old NYS exams and 161,403 cases for the new common core standards
+
+### Data collection 
+
+**Describe the method of data collection.**
+Datasets present all students who sat for either ELA or Math exam. The NY State Education Department aligned the exams as a common core standard since 2013. One dataset is the results of exams from 2013 to 2015, and another dataset results from the year 2006 to 2011
+
+### Type of study 
+
+**What type of study is this (observational/experiment)?**
+This is an observational study based on Historical data provided by Department of Education (DOE) and published by NYC Open Data
+https://data.cityofnewyork.us/Education/2013-2015-New-York-State-Mathematics-Exam-by-Schoo/gcvr-n8qw
+https://data.cityofnewyork.us/Education/2006-2011-NYS-Math-Test-Results-By-Grade-School-Le/jufi-gzgp
+
+### Data Source 
+
+**If you collected the data, state self-collected. If not, provide a citation/link.**
+NYC Open Data. “2013 - 2015 New York State Mathematics Exam by School.” NYC Open Data, Department of Education (DOE) - NYC OpenData, 14 Mar. 2016, data.cityofnewyork.us/Education/2013-2015-New-York-State-Mathematics-Exam-by-Schoo/gcvr-n8qw/data. 
+
+(DOE), Department of Education. “2006 - 2011 NYS Math Test Results By Grade - School Level - All Students: NYC Open Data.” 2006 - 2011 NYS Math Test Results By Grade - School Level - All Students | NYC Open Data, NYC Open Data, 6 Oct. 2011, data.cityofnewyork.us/Education/2006-2011-NYS-Math-Test-Results-By-Grade-School-Le/jufi-gzgp. 
+
+### Dependent Variable
+
+**What is the response variable? Is it quantitative or qualitative?**
+Year, School, District, Borough are response qualitative variables.
+
+
+### Independent Variable
+
+**You should have two independent variables, one quantitative and one qualitative.**
+\newline * Qualitative independent variables: Grade, Race, Level
+\newline * Quantitative independent variables: NumberTested, MeanScaleScore
+
+
+### Relevant summary statistics 
+
+**Provide summary statistics for each the variables. Also include appropriate visualizations related to your research question (e.g. scatter plot, boxplots, etc). This step requires the use of R, hence a code chunk is provided below. Insert more code chunks as needed.**
+
+```{r data-summary} 
+summary(math_test_old)
+summary(math_test_new)
+```
+
+### The change in Tested Ratio & ANOVA Test
+
+1. The number of students who took NYS Exams has declined. The below boxplots show that the percentage of test-taker is similar to years before between boroughs. Staten Island increases the mean of the tested ratio while the upper quartile is lower than 2006-2011.
+
+2. ANOVA Test
+$H_0$ : $\mu_K$  = $\mu_M$  = $\mu_Q$  = $\mu_R$ = $\mu_X$ .  
+      There is no difference between the borough and means of Tested ratio 
+$H_A$ : There is a different between mean of tested ratio and Borough
+
+P(>F) < 2e-16 H0 : is rejected
+
+```{r Ratio-ANOVA} 
+#Borough
+## Old Ratio
+math_test_old <-math_test_old %>%
+  mutate(borough=do::mid(DBN, 3, 1), district = do::left(DBN,2),school=do::right(DBN,3))
+df1_old <- math_test_old %>%
+  filter(Grade=="All Grades" & Category =="All Students")
+df2_old <-math_test_old %>%
+  filter(Grade=="All Grades" & Category =="All Students") %>%
+  group_by(Year) %>%
+  summarize(yeartotal = sum(NumberTested))
+
+grandtotal_old <-sum(df1_old$NumberTested)
+
+math_test_old <- merge(x = math_test_old , y = df2_old, by = "Year", all = TRUE)
+
+math_test_old <- math_test_old %>%
+  mutate(Ratio_Year = NumberTested/yeartotal,
+         Ratio_Grand =NumberTested/grandtotal_old)
+
+temp<- math_test_old %>%
+  filter(Grade=="All Grades" & Category =="All Students")%>%
+  select(DBN,Year,SchoolTotal=NumberTested)
+
+math_test_old <- merge(x = math_test_old , y = temp, by = c("Year","DBN"), all = TRUE)
+
+borough_sum_old <- math_test_old %>%
+  filter(Grade=="All Grades" & Category =="All Students")
+
+p_old_ratio_onyear<- ggplot(borough_sum_old , aes(x = borough, y = Ratio_Year,fill = borough))+
+  geom_boxplot()+
+  labs(fill = "Borough")+
+  xlab("Boroughs")+
+  ylab("Tested Ratio")+
+  ggtitle("Years 2006-2011")
+
+## New Ratio
+math_test_new <-math_test_new %>%
+  mutate(borough=do::mid(DBN, 3, 1), district = do::left(DBN,2),school=do::right(DBN,3))
+df1_new <- math_test_new %>%
+  filter(Grade=="All Grades" & Category =="All Students")
+df2_new <-math_test_new %>%
+  filter(Grade=="All Grades" & Category =="All Students") %>%
+  group_by(Year) %>%
+  summarize(yeartotal = sum(NumberTested))
+
+grandtotal_new <-sum(df1_new$NumberTested)
+
+borough_sum_new <- merge(x = df1_new, y = df2_new, by = "Year", all = TRUE)
+
+temp<- math_test_new %>%
+  filter(Grade=="All Grades" & Category =="All Students")%>%
+  select(DBN,Year,SchoolTotal=NumberTested)
+
+math_test_new <- merge(x = math_test_new , y = temp, by = c("Year","DBN"), all = TRUE)
+
+borough_sum_new<-borough_sum_new %>%
+  mutate(Ratio_Year = NumberTested/yeartotal, Ratio_Grand = NumberTested/grandtotal_new)
+
+p_new_ratio_onyear<- ggplot(borough_sum_new , aes(x = borough, y = Ratio_Year,fill = borough))+
+  geom_boxplot()+
+  labs(fill = "Borough")+
+  xlab("Boroughs")+
+  ylab("Tested Ratio")+
+  ggtitle("Years 2013-2015")
+
+grid.arrange(p_old_ratio_onyear,p_new_ratio_onyear, ncol=2)
+
+borough_old.aov <- aov(Ratio_Year ~ borough, data = borough_sum_old)
+summary(borough_old.aov)
+```
+
+3. The tested ratio by boroughs still has a similar shape to years 2006-2011 in histogram & QQ plots. However, the tested ratio by grades has a change in its shape. The histograms have bimodal distribution in 2006-2011. On the other hand, the distribution of years 2013-2015 is right-skewed.
+
+4. Dataset of 2006-2012 didn't record by Race/ethnicity of test-takers. The analysis can only perform on the observations of 2013-2015 to see the correlation race in those years. The tested Ratio of Asian and White looks closed to each other. Black and Hispanic tested ratios are similar.
+
+```{r Ratio-cont} 
+temp <- borough_sum_old %>%
+  group_by(borough) %>%
+  summarise(Mean = mean(Ratio_Year),SD =sd(Ratio_Year),N=n())
+
+new.lm <- lm(Ratio_Year ~ borough, data = borough_sum_new)
+summary(new.lm)
+old.lm <- lm(Ratio_Year ~ borough, data = borough_sum_old)
+summary(old.lm)
+
+p1 <- ggplot(borough_sum_old, aes(Ratio_Year),horizontal = TRUE) + 
+  geom_histogram(aes(x=Ratio_Year,y=..density..),bins=30) +
+  geom_density(color="brown")+
+  facet_wrap(~borough)+
+  xlab("Tested Ratio 2006-2011")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+  
+p2 <- ggplot(borough_sum_new, aes(Ratio_Year),horizontal = TRUE) + 
+  geom_histogram(aes(x=Ratio_Year,y=..density..),bins=30) +
+  geom_density(color="brown")+
+  facet_wrap(~borough)+
+  xlab("Tested Ratio 2013-2015")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+grid.arrange(p1,p2, ncol=2)
+
+ggplot(borough_sum_old, aes(sample=Ratio_Year))+
+  stat_qq(aes(color = borough))+
+  stat_qq_line(aes(color = borough))+
+  facet_grid(~borough)
+
+ggplot(borough_sum_new, aes(sample=Ratio_Year))+
+  stat_qq(aes(color = borough))+
+  stat_qq_line(aes(color = borough))+
+  facet_grid(~borough)
+
+#Ratio by Grade
+bygrade_old <- math_test_old %>% 
+        filter(Grade !=("All Grades"))
+
+bygrade_old <- bygrade_old %>% mutate(Ratio = NumberTested/SchoolTotal)
+
+p1<- ggplot(bygrade_old, aes(Ratio),horizontal = TRUE) + 
+  geom_histogram(aes(x=Ratio,y=..density..),bins=30) +
+  geom_density(color="brown")+
+  facet_wrap(~Grade)+
+  xlab("Tested Ratio 2006-2011 by Grade")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+bygrade_new<- math_test_new %>% 
+        filter(Grade !=("All Grades"))
+
+bygrade_new <- bygrade_new %>% mutate(Ratio = NumberTested/SchoolTotal)               
+
+p2<- ggplot(bygrade_new, aes(Ratio),horizontal = TRUE) + 
+  geom_histogram(aes(x=Ratio,y=..density..),bins=30) +
+  geom_density(color="brown")+
+  facet_wrap(~Grade)+
+  xlab("Tested Ratio 2013-2015 by Grade")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+grid.arrange(p1,p2, ncol=2)
+
+ggplot(bygrade_old, aes(sample=Ratio))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)
+
+ggplot(bygrade_new, aes(sample=Ratio))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)
+
+#Ratio by Race
+## No data by Race in Data 2006-2011
+byrace_new <- math_test_new %>% 
+  filter(Grade=="All Grades" & Category %in% c("Asian","Black","Hispanic","White")) 
+
+byrace_new <- byrace_new %>% mutate(Ratio= NumberTested/SchoolTotal)
+
+ggplot(byrace_new, aes(Ratio),horizontal = TRUE) + 
+  geom_histogram(aes(x=Ratio,y=..density..),bins=30) +
+  geom_density(color="brown")+
+  facet_wrap(~Category)+
+  xlab("Tested Ratio 2006-2011 by Race")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+```
+### Change in MeanScaleScore – Grade - Borough
+
+The range of scale scores is different between grades. The Chi-Square test will apply to test the independence of variables boroughs, grades, and means of scale scores.
+
+$H_0$ : That there is no difference between the Borough, Grade and Meanscore
+$H_A$ : There is a different between Meanscore, Grade and Borough.
+P(>F) < 0.05, H0 : is rejected
+
+```{r MeanScaleScore} 
+# Grade-Borough
+p1<-ggplot(bygrade_old, aes(x = Grade, y = MeanScaleScore ,fill = borough))+
+  geom_boxplot()+
+  xlab("Grade 2006-2011")
+p2<-ggplot(bygrade_new, aes(x = Grade, y = MeanScaleScore,fill = Grade))+
+  geom_boxplot()+
+  xlab("Borough 2013-2015")
+grid.arrange(p1,p2, ncol=2)
+chisq.test(table(bygrade_new$Grade, bygrade_new$borough),correct = FALSE)
+
+#Old 2006-2011
+ggplot(bygrade_old %>% filter(borough =="K"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (K)")
+
+ggplot(bygrade_old %>% filter(borough =="M"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (M)")
+
+ggplot(bygrade_old %>% filter(borough =="Q"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (Q)")
+
+ggplot(bygrade_old %>% filter(borough =="R"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (R)")
+
+ggplot(bygrade_old %>% filter(borough =="X"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (X)")
+
+#New 2013-2015
+ggplot(bygrade_new %>% filter(borough =="K"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (K)")
+
+ggplot(bygrade_new %>% filter(borough =="M"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (M)")
+
+ggplot(bygrade_new %>% filter(borough =="Q"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (Q)")
+
+ggplot(bygrade_new %>% filter(borough =="R"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (R)")
+
+ggplot(bygrade_new %>% filter(borough =="X"), aes(sample=MeanScaleScore))+
+  stat_qq(aes(color = Grade))+
+  stat_qq_line(aes(color = Grade))+
+  facet_grid(~Grade)+
+  xlab("Theoretical (X)")
+#---------------
+ggplot(bygrade_old %>% filter(borough =="K"), aes(MeanScaleScore),horizontal = TRUE) + 
+  geom_histogram(aes(x=MeanScaleScore,y=..density..),bins=30) +
+  geom_density(color="brown")+
+  facet_wrap(~Grade)+
+  xlab("Theoretical (K)")
+
+ggplot(byrace_new, aes(Ratio),horizontal = TRUE) + 
+  geom_histogram(aes(x=Ratio,y=..density..),bins=30) +
+  geom_density(color="brown")+
+  facet_wrap(~Category)
+```
+
+### The relationship between student's achievement level in boroughs & Regression
+
+* Dataset 2006-2011
+$\widehat {Percent\_Level\_1}$ = 9.7715 - 3.5054 $\times$ Queens - 3.2243 $\times$ StatenIsland + 3.1644 $\times$ Bronx
+
+$\widehat {Percent\_Level\_2}$ = 26.13404 -7.03541 $\times$ Queens - 7.15519 $\times$ StatenIsland + 5.36246 $\times$ Bronx
+
+$\widehat {Percent\_Level\_3}$ = 44.9496 2.4683 + $\times$ StatenIsland + - 1.0069 $\times$ Bronx
+
+$\widehat {Percent\_Level\_4}$ = 19.1484 + 1.2055 $\times$ Manhattan + 10.0476 $\times$ Queens +  7.9072 $\times$ StatenIsland - 7.5261 $\times$ Bronx
+
+Manhattan only has a statistical significance like other borough at Level 4. In general, Queens and Staten Island decrease at Level 1, 2 comparing to Brooklyn and Bronx. At level 3, Manhattan and Queens don't show a statistical significance. However, all five boroughs have a different statistical significance
+
+* Dataset 2013-2015
+
+$\widehat {Percent\_Level\_1}$ = 37.9642 - -3.9887 $\times$ Manhattan - 12.0509 $\times$ Queens - 10.1279 $\times$ StatenIsland + 9.6392 $\times$ Bronx
+
+$\widehat {Percent\_Level\_2}$ = 32.9259 - 2.49171 $\times$ Manhattan - 0.9128 $\times$ Queens  + 0.6145 $\times$ StatenIsland + 1.0976 $\times$ Bronx
+
+$\widehat {Percent\_Level\_3}$ = 44.9496 - 0.6947 $\times$ Manhattan +  0.4934 $\times$ Queens + 0.6145 $\times$ StatenIsland - 1.0069 $\times$ Bronx
+
+$\widehat {Percent\_Level\_4}$ = 10.9291 + 5.1229 $\times$ Manhattan + 7.6333 $\times$ Queens +  3.4820 $\times$ StatenIsland -6.0637 $\times$ Bronx
+
+All five boroughs have a statistical significance that shows a relationship between students of different boroughs and student's level achievement based on exams results.
+
+```{r by-Level-borough}
+levels<-borough_sum_old %>%
+  select(borough,NumberTested,Percent_Level_1,Percent_Level_2,Percent_Level_3,Percent_Level_4)
+
+levels_old<-melt(levels,id=c("borough","NumberTested"))
+Level_1 <- levels_old %>% filter (variable=="Percent_Level_1")
+Level_2 <- levels_old %>% filter (variable=="Percent_Level_2") 
+Level_3 <- levels_old %>% filter (variable=="Percent_Level_3") 
+Level_4 <- levels_old %>% filter (variable=="Percent_Level_4") 
+
+ggplot(data = Level_1, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 1")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level1 = lm(value ~ borough, data = Level_1)
+summary(m_level1 )
+
+ggplot(data = Level_2, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 2")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level2 <- lm(value ~ borough, data = Level_2)
+summary(m_level2 )
+
+ggplot(data = Level_3, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 2")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level3 <- lm(value ~ borough, data = Level_3)
+summary(m_level3)
+
+ggplot(data = Level_4, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 2")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level4 = lm(value ~ borough, data = Level_4)
+summary(m_level4)
+
+# New
+levels<-borough_sum_new %>%
+  select(borough,NumberTested,Percent_Level_1,Percent_Level_2,Percent_Level_3,Percent_Level_4)
+
+levels_new<-melt(levels,id=c("borough","NumberTested"))
+Level_1 <- levels_new %>% filter (variable=="Percent_Level_1")
+Level_2 <- levels_new %>% filter (variable=="Percent_Level_2") 
+Level_3 <- levels_new %>% filter (variable=="Percent_Level_3") 
+Level_4 <- levels_new %>% filter (variable=="Percent_Level_4") 
+
+ggplot(data = Level_1, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 1")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level1 <- lm(value ~ borough, data = Level_1)
+summary(m_level1 )
+
+ggplot(data = Level_2, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 2")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level2<- lm(value ~ borough, data = Level_2)
+summary(m_level2 )
+
+ggplot(data = Level_3, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 2")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level3 <- lm(value ~ borough, data = Level_3)
+summary(m_level3)
+
+ggplot(data = Level_4, aes(x = NumberTested, y = value)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")+
+  facet_grid(~borough)+
+  xlab("Number Tested")+
+  ylab("Level 2")+
+  theme(axis.text.x = element_text(size=5),
+        axis.text.y = element_text(size=5),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8))
+
+m_level4 <- lm(value ~ borough, data = Level_4)
+summary(m_level4)
+
+```
+
+```{r by-Level-race}
+byrace_new<-byrace_new %>% filter(is.na(MeanScaleScore)==0)
+m_level1 <- lm(Percent_Level_1 ~ Category, data = byrace_new)
+summary(m_level1)
+
+m_level2 <- lm(Percent_Level_2 ~ Category , data = byrace_new)
+summary(m_level2)
+
+m_level3 <- lm(Percent_Level_3 ~ Category, data = byrace_new)
+summary(m_level3)
+
+m_level4 <- lm(Percent_Level_4 ~ Category, data = byrace_new)
+summary(m_level4)
+
+p1<-ggplot(data = m_level1, aes(x = .resid)) +
+  geom_histogram(binwidth =.25) +
+  xlab("Residuals - Level 1") 
+p2<-ggplot(data = m_level2, aes(x = .resid)) +
+  geom_histogram(binwidth =.25) +
+  xlab("Residuals - Level 2") 
+p3<-ggplot(data = m_level3, aes(x = .resid)) +
+  geom_histogram(binwidth =.25) +
+  xlab("Residuals - Level 3")
+p4<-ggplot(data = m_level4, aes(x = .resid)) +
+  geom_histogram(binwidth =.25) +
+  xlab("Residuals - Level 4")
+
+grid.arrange(p1,p2,p3,p4, ncol=2,nrow=2)
+
+m_level4 <- lm(Percent_Level_4 ~ Category+borough, data = byrace_new)
+summary(m_level4)
+
+m_level1 <- lm(Percent_Level_1 ~ Category+borough, data = byrace_new)
+summary(m_level1)
+
+m_level2 <- lm(Percent_Level_2 ~ Category+borough, data = byrace_new)
+summary(m_level2)
+
+m_level3 <- lm(Percent_Level_3 ~ Category+borough, data = byrace_new)
+summary(m_level3)
+```
+
+The observations in 2013-2015 shows a relationship of a student's level achievement of exams and Race. Asian tends to achieve more Level 3 & 4 than other peers in different groups. Hispanic & Black exam results are found more in Level 1 & 2.
+
+### Conclusion
+
+1. Both datasets before and after 2013 don't show a significant change pattern in the tested ratio across boroughs. The number of students who took tests was declined after the new common score standards implemented. In general, the ratio of test-takers of each borough didn’t change. There are changes in the Bronx. The upper quartile of years 2013-2015 is lower than that of years 2006-2011. Staten Island has a higher median test ratio than other boroughs and year 2006-2011. 
+
+2. The tested ratio as well as mean scale score by grade has relationship to borough in both datasets.
+
+3. The race also has a significant relationship to test-takers across borough.
+
+These above results from observations. A deep dive into dataset such as by district might show more impact on student's achievement such as economical impact, provided programs in districts schools,and etc. Because of the relationship between borough, race, and students' achievement, test results are used to rate teachers lead to a question of the fairness rating teachers.
+ 
+
+
+
